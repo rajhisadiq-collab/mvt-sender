@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>مرسل الموفمنت</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: guided questions, one per screen. Ops clock header, progress bar, one big question card,
+   summary with edit links, then send. Grid gaps only (no flex gap) so older Samsung browsers keep spacing. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --ink:#14202b; --muted:#5c6b78; --line:#c9d2db; --field:#f7f9fb;
+  --accent:#e0a100; --accent-tint:#fbf0cf; --accent-ink:#1a1400;
+  --dep:#0f5c8c; --dep-tint:#e2eef6; --arr:#2d7a4a; --arr-tint:#e3f1e8; --warn:#b4471b; --warn-tint:#fbe9e1;
+  --strip:#0f1a24; --strip-ink:#f2d27a; --on-solid:#ffffff;
+  --f-ui:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",Arial,sans-serif;
+  --f-mono:"IBM Plex Mono","Droid Sans Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c131a; --surface:#15202b; --ink:#e6edf3; --muted:#93a3b2; --line:#33445a; --field:#0f1821;
+  --accent:#f0b429; --accent-tint:#3a2f12; --accent-ink:#1a1400;
+  --dep:#4fa3d9; --dep-tint:#13293a; --arr:#5cbf82; --arr-tint:#13301f; --warn:#f08a5d; --warn-tint:#3a1f14;
+  --strip:#05090d; --strip-ink:#f2d27a; --on-solid:#0c131a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c131a; --surface:#15202b; --ink:#e6edf3; --muted:#93a3b2; --line:#33445a; --field:#0f1821;
+  --accent:#f0b429; --accent-tint:#3a2f12; --accent-ink:#1a1400;
+  --dep:#4fa3d9; --dep-tint:#13293a; --arr:#5cbf82; --arr-tint:#13301f; --warn:#f08a5d; --warn-tint:#3a1f14;
+  --strip:#05090d; --strip-ink:#f2d27a; --on-solid:#0c131a; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{background:#eef1f4;background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:16px;line-height:1.5;
+  padding-left:16px;padding-right:16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:14px;padding-bottom:40px}
+.wrap{max-width:520px;margin:0 auto;display:grid;grid-gap:14px;gap:14px}
+button{font-family:inherit;cursor:pointer}
+button:focus,input:focus,a:focus{outline:3px solid var(--accent);outline-offset:1px}
+
+.top{display:grid;grid-template-columns:1fr auto;grid-gap:10px;gap:10px;align-items:center}
+.top h1{margin:0;font-size:1.2rem;line-height:1.2}
+.top p{margin:2px 0 0;color:var(--muted);font-size:.8rem}
+.clock{background:var(--strip);color:var(--strip-ink);border-radius:10px;padding:6px 10px;text-align:center;font-family:var(--f-mono);direction:ltr}
+.clock b{display:block;font-size:1.1rem;line-height:1.2}
+.clock span{font-size:.7rem;color:var(--muted)}
+
+/* home */
+.modes{display:grid;grid-template-columns:1fr 1fr;grid-gap:12px;gap:12px}
+.mode{border:2px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);padding:22px 10px;text-align:center}
+.mode .ic{font-size:2rem;display:block;line-height:1.2}
+.mode b{display:block;font-size:1.25rem}
+.mode small{display:block;font-family:var(--f-mono);font-size:.72rem;color:var(--muted);letter-spacing:.06em}
+.mode.dep{border-color:var(--dep);background:var(--dep-tint)} .mode.dep b{color:var(--dep)}
+.mode.arr{border-color:var(--arr);background:var(--arr-tint)} .mode.arr b{color:var(--arr)}
+.sec-t{font-size:.78rem;letter-spacing:.06em;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line);padding-bottom:4px}
+
+/* question screen */
+.qhead{display:grid;grid-template-columns:auto 1fr auto;grid-gap:10px;gap:10px;align-items:center}
+.qhead .tag{font-size:.8rem;font-weight:700;padding:3px 10px;border-radius:999px}
+.tag.dep{color:var(--dep);border:1.5px solid var(--dep)} .tag.arr{color:var(--arr);border:1.5px solid var(--arr)}
+.qhead .cnt{font-size:.82rem;color:var(--muted);text-align:center}
+.x{background:none;border:1.5px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 10px;font-size:.8rem}
+.prog{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);width:0}
+@media (prefers-reduced-motion:no-preference){.prog i{transition:width .25s}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 16px;display:grid;grid-gap:14px;gap:14px}
+.q{margin:0;font-size:1.35rem;line-height:1.35}
+.qh{margin:-6px 0 0;color:var(--muted);font-size:.88rem}
+
+.choices{display:grid;grid-gap:10px;gap:10px}
+.ch{display:block;width:100%;text-align:right;padding:15px 14px;border-radius:12px;border:2px solid var(--line);background:var(--field);color:var(--ink);font-size:1.05rem;font-weight:700}
+.ch span{display:block;font-weight:400;font-size:.82rem;color:var(--muted);font-family:var(--f-mono);direction:ltr;text-align:right}
+.ch.main{border-color:var(--dep);background:var(--dep-tint);color:var(--dep)}
+.arrflow .ch.main{border-color:var(--arr);background:var(--arr-tint);color:var(--arr)}
+.ch.sel{border-color:var(--accent);background:var(--accent-tint)}
+.ch.ghost{background:none;border-style:dashed;font-weight:500}
+.yn{display:grid;grid-template-columns:1fr 1fr;grid-gap:10px;gap:10px}
+.yn .ch{text-align:center;font-size:1.15rem}
+
+.row{display:grid;grid-template-columns:1fr 1fr;grid-gap:10px;gap:10px;align-items:end}
+.holds{display:grid;grid-template-columns:repeat(5,1fr);grid-gap:6px;gap:6px}
+.field{display:grid;grid-gap:4px;gap:4px;min-width:0}
+.field>label{font-weight:500;font-size:.9rem;line-height:1.3}
+.holds .field>label{text-align:center;font-size:.78rem}
+.hint{font-size:.78rem;color:var(--muted);line-height:1.35}
+.box{-webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;height:54px;margin:0;
+  font-family:var(--f-mono);font-size:20px;padding:0 10px;border:2px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);
+  direction:ltr;text-align:center;letter-spacing:.04em;text-transform:uppercase}
+.box.free{text-transform:none;text-align:left;font-size:17px}
+.holds .box{font-size:16px;padding:0 2px}
+.box::placeholder{color:var(--muted);opacity:.55}
+.box.bad{border-color:var(--warn);background:var(--warn-tint)}
+
+/* time question */
+.nowbtn{display:block;width:100%;padding:16px;border-radius:12px;border:0;background:var(--dep);color:var(--on-solid);font-size:1.2rem;font-weight:700}
+.arrflow .nowbtn{background:var(--arr)}
+.nowbtn span{display:block;font-family:var(--f-mono);font-weight:500;font-size:.85rem;opacity:.85}
+.or{text-align:center;color:var(--muted);font-size:.85rem}
+.tz{display:grid;grid-template-columns:1fr 1fr;grid-gap:6px;gap:6px}
+.tz button{font-size:.8rem;padding:6px;border-radius:999px;border:1.5px solid var(--line);background:var(--field);color:var(--ink)}
+.tz button.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.z{font-family:var(--f-mono);font-size:.88rem;color:var(--muted);direction:ltr;text-align:center;min-height:1.3em}
+.z b{color:var(--ink)}
+.eta{border:2px solid var(--line);border-radius:12px;padding:10px;text-align:center;background:var(--field)}
+.eta.on{border-color:var(--dep);background:var(--dep-tint)}
+.eta .t{font-size:.8rem;color:var(--muted)}
+.eta .v{font-family:var(--f-mono);font-size:1.5rem;font-weight:600;direction:ltr;color:var(--dep)}
+.eta .s{font-size:.82rem}
+
+.err{margin:0;color:var(--warn);font-weight:500;font-size:.92rem}
+.nav{display:grid;grid-template-columns:auto 1fr;grid-gap:10px;gap:10px}
+.back{padding:14px 16px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700}
+.next{padding:14px;border-radius:12px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:1.1rem}
+
+/* summary */
+.sum{display:grid;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.srow{display:grid;grid-template-columns:auto 1fr auto;grid-gap:10px;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);background:var(--field)}
+.srow:first-child{border-top:0}
+.srow .k{font-size:.85rem;color:var(--muted)}
+.srow .v{font-family:var(--f-mono);direction:ltr;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.srow button{font-size:.78rem;padding:4px 10px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--dep);font-weight:700}
+.strip{background:var(--strip);color:var(--strip-ink);border-radius:12px;padding:14px;font-family:var(--f-mono);font-size:.98rem;line-height:1.7;white-space:pre;direction:ltr;text-align:left;overflow-x:auto;margin:0}
+.send{display:grid;grid-template-columns:1fr 1fr;grid-gap:10px;gap:10px}
+.send button,.send a{display:block;font-weight:700;font-size:1.05rem;padding:14px 8px;border-radius:12px;text-align:center;text-decoration:none;border:0}
+.send .cp{background:var(--accent);color:var(--accent-ink)}
+.send .wa{background:#25a35a;color:#ffffff}
+.again{display:block;width:100%;padding:12px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700}
+
+.history{display:grid;grid-gap:8px;gap:8px}
+.hitem{display:grid;grid-template-columns:auto 1fr auto;grid-gap:10px;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:.88rem}
+.hitem .m{font-family:var(--f-mono);direction:ltr;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.pill{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.dep{color:var(--dep);border:1px solid var(--dep)} .pill.arr{color:var(--arr);border:1px solid var(--arr)}
+.hitem button{font-size:.8rem;padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--ink)}
+.empty{font-size:.88rem;color:var(--muted);padding:12px;border:1.5px dashed var(--line);border-radius:10px;text-align:center}
+.toast{position:fixed;left:16px;right:16px;bottom:24px;bottom:calc(24px + env(safe-area-inset-bottom,0px));text-align:center;z-index:6}
+.toast span{display:inline-block;background:var(--ink);color:var(--surface);padding:10px 18px;border-radius:999px;font-weight:500}
+.cpy{position:absolute;left:-9999px;top:0}
+@media (max-width:400px){.holds{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:330px){.row,.modes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="wrap" dir="rtl">
+  <div class="top">
+    <div><h1>مرسل الموفمنت</h1><p>جاوب على الأسئلة، والرسالة تتجهز لحالها</p></div>
+    <div class="clock"><b id="clkZ">--:--Z</b><span id="clkL">ليبيا --:--</span></div>
+  </div>
+  <div id="app"></div>
+</div>
+<div class="toast" id="toast" hidden><span id="toastT"></span></div>
+<textarea class="cpy" id="cpy" readonly tabindex="-1" aria-hidden="true"></textarea>
+
+<script>
+(function(){
+"use strict";
+function $(id){return document.getElementById(id)}
+function sget(k,d){try{var v=window.localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function sset(k,v){try{window.localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function pad2(x){x=String(x);return x.length<2?"0"+x:x}
+function hhmm(t){return pad2(Math.floor(t/60))+pad2(t%60)}
+function fmt(t){return pad2(Math.floor(t/60))+":"+pad2(t%60)}
+function trim(s){return String(s||"").replace(/^\s+|\s+$/g,"")}
+function clean(s){return trim(s).toUpperCase().replace(/[\s\-]/g,"")}
+function num(v){var x=parseInt(v,10);return isNaN(x)||x<0?0:x}
+function diff(a,b){return ((b-a)+1440)%1440}
+function wrapM(t){return ((t%1440)+1440)%1440}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function val(id){var e=$(id);return e?e.value:""}
+
+var OFF=120; // Libya UTC+2
+var APT={MJI:"معيتيقة",ALG:"الجزائر"};
+var PSM=[["WCHR","كرسي متحرك، يطلع الدرج"],["WCHS","كرسي، ما يطلعش الدرج"],["WCHC","ما يمشيش نهائياً"],["UMNR","طفل مسافر بروحه"],["MEDA","حالة طبية"],["BLND","كفيف"]];
+var useLocal=true, S=null, cur=null, screen="home", viewText="";
+
+function utcMin(){var d=new Date();return d.getUTCHours()*60+d.getUTCMinutes()}
+function todayDay(){return pad2(new Date().getUTCDate())}
+function dayKey(){return new Date().toISOString().slice(0,10)}
+function aptName(c){return APT[c]||c}
+function showT(z){return z==null?"":fmt(useLocal?wrapM(z+OFF):z)}
+function zLabel(z){return z==null?"--":fmt(z)+"Z ("+fmt(wrapM(z+OFF))+" ليبيا)"}
+function parseT(v){
+  var d=(v||"").replace(/\D/g,"");
+  if(d.length<3)return null; if(d.length===3)d="0"+d;
+  var h=parseInt(d.slice(0,2),10),m=parseInt(d.slice(2,4),10);
+  if(h>23||m>59)return null;
+  return wrapM(h*60+m-(useLocal?OFF:0));
+}
+function tick(){var z=utcMin();$("clkZ").textContent=fmt(z)+"Z";$("clkL").textContent="ليبيا "+fmt(wrapM(z+OFF))}
+tick(); setInterval(tick,20000);
+
+function flights(){return sget("mvt_flights",[])}
+function hist(){return sget("mvt_hist",{})[dayKey()]||[]}
+function pending(){
+  var seen={};
+  return hist().filter(function(x){return x.mode==="dep"&&!x.arrived}).reverse()
+    .filter(function(x){if(seen[x.flt])return false;seen[x.flt]=1;return true});
+}
+
+/* ---------- state ---------- */
+function newDep(){
+  S={mode:"dep",newFlt:!flights().length,flt:"",reg:"",from:"MJI",to:"ALG",durH:2,durM:0,day:todayDay(),
+     off:null,air:null,c:"",y:"",kids:null,ch:0,inf:0,bags:"",ext:null,cfg:"Y70",crew:"2/2",holds:["","","","",""],psm:{},psmSi:"",si:"",edit:null,otherRoute:false};
+}
+function newArr(){S={mode:"arr",flt:"",reg:"",at:"MJI",day:todayDay(),tdn:null,onb:null,manual:!pending().length,edit:null,si:""}}
+
+/* ---------- questions ---------- */
+function timeQ(key,title,hint,extra){
+  return {id:key,title:title,hint:hint,type:"time",when:function(){return true},
+    body:function(){
+      return '<button type="button" class="nowbtn" data-act="now">الآن<span>'+fmt(useLocal?wrapM(utcMin()+OFF):utcMin())+(useLocal?" ليبيا":"Z")+'</span></button>'+
+        '<div class="or">أو اكتب الوقت بنفسك</div>'+
+        '<div class="tz"><button type="button" data-tz="1" class="'+(useLocal?"on":"")+'">توقيت ليبيا</button><button type="button" data-tz="0" class="'+(useLocal?"":"on")+'">توقيت Z</button></div>'+
+        '<input id="tm" class="box" inputmode="numeric" maxlength="5" placeholder="12:15" autocomplete="off" value="'+showT(S[key])+'">'+
+        '<div class="z" id="tmZ"></div>'+(extra?extra():"");
+    },
+    live:function(){
+      var z=parseT(val("tm")),el=$("tmZ"),raw=val("tm").replace(/\D/g,"");
+      el.innerHTML=z===null?(raw.length>=3?"وقت غلط":""):(useLocal?"= <b>"+fmt(z)+"Z</b>":"<b>"+fmt(z)+"Z</b> = ليبيا "+fmt(wrapM(z+OFF)));
+      if(key==="air")etaLive(z);
+    },
+    read:function(){var z=parseT(val("tm"));if(z===null)return "اكتب الوقت بالأرقام، مثلاً 1215، أو اضغط الآن.";S[key]=z;return checkTimes(key)}
+  };
+}
+function etaBox(){return '<div class="eta" id="eta"><div class="t">موعد الوصول المتوقع</div><div class="v" id="etaV">--:--</div><div class="s" id="etaS">زمن الرحلة '+S.durH+':'+pad2(S.durM)+'</div></div>'}
+function etaLive(z){
+  var d=S.durH*60+S.durM;if(!$("eta"))return;
+  if(z===null||d<1){$("eta").className="eta";$("etaV").textContent="--:--";return}
+  var e=wrapM(z+d);$("eta").className="eta on";$("etaV").textContent=fmt(e)+"Z";$("etaS").textContent="= "+fmt(wrapM(e+OFF))+" بتوقيت ليبيا · زمن الرحلة "+S.durH+":"+pad2(S.durM);
+}
+function checkTimes(key){
+  if(S.mode==="dep"&&key==="air"&&S.off!=null&&diff(S.off,S.air)>90)return "الإقلاع لازم يكون بعد التحرك من الموقف ("+fmt(wrapM(S.off+(useLocal?OFF:0)))+"). تأكد من الوقت.";
+  if(S.mode==="dep"&&key==="off"&&S.air!=null&&diff(S.off,S.air)>90)S.air=null;
+  if(S.mode==="arr"&&key==="onb"&&S.tdn!=null&&diff(S.tdn,S.onb)>60)return "الوصول للموقف لازم يكون بعد الهبوط بدقائق. تأكد من الوقت.";
+  if(S.mode==="arr"&&key==="tdn"&&S.onb!=null&&diff(S.tdn,S.onb)>60)S.onb=null;
+  return "";
+}
+function numField(id,label,v,ph){return '<div class="field"><label for="'+id+'">'+label+'</label><input id="'+id+'" class="box" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="'+(ph||"0")+'" value="'+esc(v)+'" autocomplete="off"></div>'}
+function txtField(id,label,v,ph,free){return '<div class="field"><label for="'+id+'">'+label+'</label><input id="'+id+'" class="box'+(free?" free":"")+'" placeholder="'+ph+'" value="'+esc(v)+'" autocomplete="off" autocapitalize="characters"></div>'}
+
+var DEP=[
+  {id:"pick",when:function(){return flights().length>0&&!S.edit},title:"أي رحلة؟",hint:"اختر من رحلاتك المحفوظة",type:"choice",
+    body:function(){
+      var h='<div class="choices">';
+      flights().forEach(function(f,i){h+='<button type="button" class="ch main" data-pick="'+i+'">'+esc(f.flt)+'<span>'+esc(f.from)+' → '+esc(f.to)+' · '+esc(f.reg)+'</span></button>'});
+      return h+'<button type="button" class="ch ghost" data-act="newflt">+ رحلة جديدة</button></div>';
+    }},
+  {id:"flt",when:function(){return S.newFlt||S.edit==="flt"},title:"شن رقم الرحلة؟",hint:"مثال: LXX101",type:"input",
+    body:function(){return '<input id="i1" class="box" placeholder="LXX101" autocapitalize="characters" autocomplete="off" value="'+esc(S.flt)+'">'},
+    read:function(){var v=clean(val("i1"));if(!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(v))return "اكتب رقم الرحلة صح، مثلاً LXX101.";S.flt=v;return ""}},
+  {id:"route",when:function(){return S.newFlt||S.edit==="route"},title:"من وين لوين؟",type:"choice",
+    body:function(){
+      return '<div class="choices">'+
+        '<button type="button" class="ch main" data-route="MJI-ALG">معيتيقة ← الجزائر<span>MJI → ALG</span></button>'+
+        '<button type="button" class="ch main" data-route="ALG-MJI">الجزائر ← معيتيقة<span>ALG → MJI</span></button>'+
+        '<button type="button" class="ch ghost" data-act="other">مطار آخر</button></div>'+
+        (S.otherRoute?'<div class="row">'+txtField("rf","من (3 حروف)",S.from,"MJI")+txtField("rt","إلى (3 حروف)",S.to,"ALG")+'</div>':"");
+    },
+    read:function(){var f=clean(val("rf")),t=clean(val("rt"));if(!/^[A-Z]{3}$/.test(f)||!/^[A-Z]{3}$/.test(t))return "رمز المطار 3 حروف، مثل MJI أو ALG.";if(f===t)return "مطار الوصول نفس مطار المغادرة.";S.from=f;S.to=t;return ""},
+    hasNext:function(){return S.otherRoute}},
+  {id:"dur",when:function(){return S.newFlt||S.edit==="dur"},title:"قداش زمن الرحلة؟",hint:"من الإقلاع للهبوط. نستخدمه نحسب موعد الوصول.",type:"input",
+    body:function(){return '<div class="row">'+numField("dh","ساعات",S.durH,"2")+numField("dm","دقائق",S.durM,"0")+'</div>'},
+    read:function(){var h=num(val("dh")),m=num(val("dm"));if(m>59)return "الدقائق لازم أقل من 60.";if(h*60+m<10)return "اكتب زمن الرحلة.";S.durH=h;S.durM=m;return ""}},
+  {id:"reg",when:function(){return true},title:"شن تسجيل الطائرة؟",hint:"المكتوب على جسم الطائرة، مثال 5A-ABC",type:"input",
+    body:function(){
+      return (S.reg?'<div class="choices"><button type="button" class="ch main" data-act="samereg">نفس الطائرة<span>'+esc(S.reg)+'</span></button></div><div class="or">أو اكتب طائرة ثانية</div>':"")+
+        '<input id="i1" class="box" placeholder="5A-ABC" autocapitalize="characters" autocomplete="off" value="">';
+    },
+    read:function(){var v=trim(val("i1")).toUpperCase();if(!v&&S.reg)return "";if(clean(v).length<4)return "اكتب تسجيل الطائرة، مثلاً 5A-ABC.";S.reg=v;return ""}},
+  {id:"day",when:function(){return S.edit==="day"},title:"يوم الرحلة (من الشهر)؟",hint:"اليوم المجدول للمغادرة",type:"input",
+    body:function(){return '<input id="i1" class="box" inputmode="numeric" maxlength="2" value="'+esc(S.day)+'">'},
+    read:function(){var d=num(val("i1"));if(d<1||d>31)return "اكتب رقم من 1 لين 31.";S.day=pad2(d);return ""}},
+  timeQ("off","متى تحركت الطائرة من الموقف؟","Off-block: لحظة ما بدت الطائرة تتحرك"),
+  timeQ("air","متى أقلعت الطائرة؟","Airborne: لحظة ما رفعت العجلات",etaBox),
+  {id:"pax",when:function(){return true},title:"كم راكب؟",hint:"الأطفال محسوبين هنا. الرضّع نسألك عليهم بعدين.",type:"input",
+    body:function(){return '<div class="row">'+numField("pc","بزنس",S.c)+numField("py","إيكونومي",S.y)+'</div>'},
+    read:function(){if(val("pc")===""&&val("py")==="")return "اكتب العدد (0 لو ما فيش).";S.c=num(val("pc"));S.y=num(val("py"));if(S.c+S.y===0)return "لازم يكون فيه راكب واحد على الأقل.";return ""}},
+  {id:"kids",when:function(){return true},title:"فيه أطفال أو رضّع؟",type:"choice",
+    body:function(){
+      return '<div class="yn"><button type="button" class="ch main" data-act="nokids">لا</button><button type="button" class="ch'+(S.kids?" sel":"")+'" data-act="kids">نعم</button></div>'+
+        (S.kids?'<div class="row">'+numField("kc","أطفال (من الركاب)",S.ch||"")+numField("ki","رضّع (بدون كرسي)",S.inf||"")+'</div>':"");
+    },
+    read:function(){var c=num(val("kc")),i=num(val("ki"));if(c>S.c+S.y)return "الأطفال أكثر من الركاب.";if(i>S.c+S.y-c)return "الرضّع أكثر من البالغين.";S.ch=c;S.inf=i;return ""},
+    hasNext:function(){return !!S.kids}},
+  {id:"bags",when:function(){return true},title:"كم حقيبة في العنابر؟",type:"input",
+    body:function(){return numField("i1","عدد الحقائب",S.bags)},
+    read:function(){if(val("i1")==="")return "اكتب العدد (0 لو ما فيش).";S.bags=num(val("i1"));return ""}},
+  {id:"ext",when:function(){return true},title:"تبي تبعت رسائل إضافية؟",hint:"LDM للحمولة، PSM لركاب الخدمات الخاصة",type:"choice",
+    body:function(){
+      return '<div class="choices"><button type="button" class="ch main" data-ext="">لا، الموفمنت بس</button>'+
+        '<button type="button" class="ch" data-ext="L">LDM<span>LOAD</span></button>'+
+        '<button type="button" class="ch" data-ext="P">PSM<span>SPECIAL SERVICES</span></button>'+
+        '<button type="button" class="ch" data-ext="LP">الاتنين<span>LDM + PSM</span></button></div>';
+    }},
+  {id:"ldm",when:function(){return S.ext&&S.ext.indexOf("L")>=0},title:"بيانات الحمولة (LDM)",hint:"عبّي وزن العنابر اللي فيها حمولة بس",type:"input",
+    body:function(){
+      var h='<div class="row">'+txtField("cfg","توزيع الكراسي",S.cfg,"Y70")+txtField("crw","الطاقم (قيادة/مضيفين)",S.crew,"2/2")+'</div><div class="holds">';
+      for(var i=0;i<5;i++)h+=numField("h"+i,"عنبر "+(i+1),S.holds[i],"-");
+      return h+'</div>';
+    },
+    read:function(){
+      var cfg=clean(val("cfg")),crw=val("crw").replace(/\s/g,"");
+      if(!cfg)return "اكتب توزيع الكراسي، مثلاً Y70 أو C8Y62.";
+      if(!/^\d+\/\d+$/.test(crw))return "الطاقم يتكتب بالشكل 2/2.";
+      S.cfg=cfg;S.crew=crw;for(var i=0;i<5;i++)S.holds[i]=val("h"+i)===""?"":num(val("h"+i));return "";
+    }},
+  {id:"psm",when:function(){return S.ext&&S.ext.indexOf("P")>=0},title:"ركاب الخدمات الخاصة (PSM)",hint:"اكتب العدد قدام الخدمة المطلوبة بس",type:"input",
+    body:function(){
+      var h='<div class="row">';
+      PSM.forEach(function(p){h+=numField("p_"+p[0],'<b style="font-family:var(--f-mono)">'+p[0]+'</b> <span class="hint">'+p[1]+'</span>',S.psm[p[0]]||"","-")});
+      return h+'</div>'+txtField("psi","ملاحظة (اختياري)",S.psmSi,"WCHC NEEDS AMBULIFT",true);
+    },
+    read:function(){var any=false;PSM.forEach(function(p){var k=num(val("p_"+p[0]));S.psm[p[0]]=k;if(k)any=true});if(!any)return "اكتب عدد واحد على الأقل.";S.psmSi=trim(val("psi")).toUpperCase();return ""}},
+  {id:"sum",when:function(){return true},title:"راجع وابعت",type:"sum"}
+];
+
+var ARR=[
+  {id:"apick",when:function(){return !S.manual&&!S.edit},title:"أي رحلة وصلت؟",hint:"رحلات المغادرة اللي بعثتها اليوم",type:"choice",
+    body:function(){
+      var h='<div class="choices">';
+      pending().forEach(function(p,i){h+='<button type="button" class="ch main" data-apick="'+i+'">'+esc(p.flt)+'<span>'+esc(p.from)+' → '+esc(p.to)+' · EA '+esc(p.ea)+'Z</span></button>'});
+      return h+'<button type="button" class="ch ghost" data-act="manual">رحلة ثانية مش في القائمة</button></div>';
+    }},
+  {id:"amanual",when:function(){return S.manual||S.edit==="amanual"},title:"بيانات الرحلة اللي وصلت",type:"input",
+    body:function(){
+      return '<div class="row">'+txtField("af","رقم الرحلة",S.flt,"LXX102")+txtField("ar","تسجيل الطائرة",S.reg,"5A-ABC")+'</div>'+
+        '<div class="field"><label>وين هبطت؟</label><div class="yn"><button type="button" class="ch'+(S.at==="MJI"?" sel":"")+'" data-at="MJI">معيتيقة</button><button type="button" class="ch'+(S.at==="ALG"?" sel":"")+'" data-at="ALG">الجزائر</button></div>'+
+        '<input id="aat" class="box" maxlength="3" value="'+esc(S.at)+'" autocapitalize="characters"></div>'+
+        numField("ad","يوم الرحلة (من الشهر)",S.day);
+    },
+    read:function(){
+      var f=clean(val("af")),r=trim(val("ar")).toUpperCase(),a=clean(val("aat")),d=num(val("ad"));
+      if(!f)return "اكتب رقم الرحلة.";if(clean(r).length<4)return "اكتب تسجيل الطائرة.";
+      if(!/^[A-Z]{3}$/.test(a))return "رمز المطار 3 حروف، مثل MJI.";if(d<1||d>31)return "يوم الرحلة من 1 لين 31.";
+      S.flt=f;S.reg=r;S.at=a;S.day=pad2(d);return "";
+    }},
+  timeQ("tdn","متى هبطت الطائرة؟","Touchdown: لحظة ما لمست العجلات المدرج"),
+  timeQ("onb","متى وصلت الطائرة للموقف؟","On-block: لحظة ما وقفت في الموقف"),
+  {id:"sum",when:function(){return true},title:"راجع وابعت",type:"sum"}
+];
+
+/* ---------- message ---------- */
+function build(){
+  var reg=clean(S.reg),parts;
+  if(S.mode==="dep"){
+    var dur=S.durH*60+S.durM,total=S.c+S.y+S.inf,ad=S.c+S.y-S.ch;
+    var mvt=["MVT",S.flt+"/"+S.day+"."+reg+"."+S.from,"AD"+hhmm(S.off)+"/"+hhmm(S.air)+" EA"+hhmm(wrapM(S.air+dur))+" "+S.to,"PX"+total];
+    var hasL=S.ext&&S.ext.indexOf("L")>=0,hasP=S.ext&&S.ext.indexOf("P")>=0;
+    if(!hasL&&S.bags>0)mvt.push("SI BAGS "+S.bags);
+    if(S.si)mvt.push(S.si.indexOf("SI")===0?S.si:"SI "+S.si);
+    parts=[mvt.join("\n")];
+    if(hasL){
+      var T=0,hs="";for(var i=0;i<5;i++){var w=num(S.holds[i]);if(w>0){T+=w;hs+="."+(i+1)+"/"+w}}
+      var l=["LDM",S.flt+"/"+S.day+"."+reg+"."+S.cfg+"."+S.crew,"-"+S.to+"."+ad+"/"+S.ch+"/"+S.inf+".T"+T+hs+".PAX/"+S.c+"/"+S.y+".PAD/0/0"];
+      if(S.bags>0)l.push("SI BAGS "+S.bags);parts.push(l.join("\n"));
+    }
+    if(hasP){
+      var p=["PSM",S.flt+"/"+S.day+" "+S.from,"-"+S.to];
+      PSM.forEach(function(x){if(S.psm[x[0]])p.push(x[0]+" "+S.psm[x[0]])});
+      if(S.psmSi)p.push(S.psmSi.indexOf("SI")===0?S.psmSi:"SI "+S.psmSi);parts.push(p.join("\n"));
+    }
+  }else{
+    var m=["MVT",S.flt+"/"+S.day+"."+reg+"."+S.at,"AA"+hhmm(S.tdn)+"/"+hhmm(S.onb)];
+    if(S.si)m.push(S.si.indexOf("SI")===0?S.si:"SI "+S.si);
+    parts=[m.join("\n")];
+  }
+  return parts.join("\n\n");
+}
+function sumRows(){
+  if(S.mode==="dep"){
+    var dur=S.durH*60+S.durM;
+    var ext=!S.ext?"لا":S.ext==="L"?"LDM":S.ext==="P"?"PSM":"LDM + PSM";
+    return [["الرحلة",S.flt,"flt"],["المسار",S.from+" → "+S.to,"route"],["زمن الرحلة",S.durH+":"+pad2(S.durM),"dur"],["الطائرة",S.reg,"reg"],["يوم الرحلة",S.day,"day"],
+      ["التحرك",zLabel(S.off),"off"],["الإقلاع",zLabel(S.air),"air"],["الوصول المتوقع",zLabel(wrapM(S.air+dur)),"air"],
+      ["بزنس / إيكونومي",S.c+" / "+S.y,"pax"],["أطفال / رضّع",S.ch+" / "+S.inf,"kids"],["الحقائب",String(S.bags),"bags"],["إضافات",ext,"ext"]];
+  }
+  return [["الرحلة",S.flt,"amanual"],["الطائرة",S.reg,"amanual"],["مطار الهبوط",S.at,"amanual"],["يوم الرحلة",S.day,"amanual"],["الهبوط",zLabel(S.tdn),"tdn"],["الموقف",zLabel(S.onb),"onb"]];
+}
+
+/* ---------- navigation ---------- */
+function steps(){return (S.mode==="dep"?DEP:ARR).filter(function(s){return s.when()})}
+function stepById(id){var l=S.mode==="dep"?DEP:ARR;for(var i=0;i<l.length;i++)if(l[i].id===id)return l[i];return null}
+function go(id){cur=id;render()}
+function goNext(){
+  if(S.edit){S.edit=null;S.otherRoute=false;return go("sum")}
+  var l=steps(),i=0;for(;i<l.length;i++)if(l[i].id===cur)break;
+  go(l[Math.min(i+1,l.length-1)].id);
+}
+function goBack(){
+  if(S.edit){S.edit=null;return go("sum")}
+  var l=steps(),i=0;for(;i<l.length;i++)if(l[i].id===cur)break;
+  if(i<=0){screen="home";return render()}
+  go(l[i-1].id);
+}
+function editStep(id){
+  S.edit=id;
+  if(id==="route")S.otherRoute=!(S.from==="MJI"&&S.to==="ALG")&&!(S.from==="ALG"&&S.to==="MJI");
+  go(id);
+}
+
+/* ---------- render ---------- */
+function render(){
+  var app=$("app");
+  if(screen==="home")return renderHome(app);
+  if(screen==="view"){
+    app.innerHTML='<section class="card"><h2 class="q">رسالة سابقة</h2><pre class="strip">'+esc(viewText)+'</pre>'+sendBtns(viewText)+'<button type="button" class="again" data-act="home">رجوع</button></section>';
+    return bindSend(app,viewText,false);
+  }
+  var st=stepById(cur), l=steps(), idx=0;
+  for(var i=0;i<l.length;i++)if(l[i].id===cur)idx=i;
+  var total=l.length-1, pct=st.type==="sum"?100:Math.round(idx/total*100);
+  var h='<div class="qhead"><span class="tag '+S.mode+'">'+(S.mode==="dep"?"🛫 مغادرة":"🛬 وصول")+'</span>'+
+    '<span class="cnt">'+(st.type==="sum"?"المراجعة":S.edit?"تعديل":"سؤال "+(idx+1)+" من "+total)+'</span>'+
+    '<button type="button" class="x" data-act="home">إلغاء</button></div><div class="prog"><i style="width:'+pct+'%"></i></div>';
+  h+='<section class="card '+(S.mode==="arr"?"arrflow":"")+'"><h2 class="q">'+st.title+'</h2>'+(st.hint?'<p class="qh">'+st.hint+'</p>':"");
+  if(st.type==="sum"){
+    var text=build();
+    h+='<div class="sum">';
+    sumRows().forEach(function(r){h+='<div class="srow"><span class="k">'+r[0]+'</span><span class="v">'+esc(r[1])+'</span><button type="button" data-edit="'+r[2]+'">تعديل</button></div>'});
+    h+='</div>'+txtField("si","ملاحظة على الموفمنت (اختياري)",S.si,"SI ...",true)+
+      '<pre class="strip" id="msg">'+esc(text)+'</pre>'+sendBtns(text)+
+      '<button type="button" class="again" data-act="home">رسالة جديدة</button></section>';
+    app.innerHTML=h; bindCommon(app,st); bindSend(app,text,true);
+    $("si").addEventListener("input",function(){S.si=trim(this.value).toUpperCase();var t=build();$("msg").textContent=t;setSendText(app,t)});
+    return;
+  }
+  h+=st.body()+'<p class="err" id="err" hidden></p>';
+  var showNext=st.type==="input"||st.type==="time"||(st.hasNext&&st.hasNext());
+  h+='<div class="nav"><button type="button" class="back" data-act="back">رجوع</button>'+(showNext?'<button type="button" class="next" data-act="next">'+(S.edit?"حفظ":"التالي")+'</button>':'<span></span>')+'</div></section>';
+  app.innerHTML=h;
+  bindCommon(app,st);
+  if(st.live){st.live();$("tm").addEventListener("input",function(){var d=this.value.replace(/\D/g,"").slice(0,4);this.value=d.length>2?d.slice(0,2)+":"+d.slice(2):d;st.live()})}
+  var first=app.querySelector("input");
+  if(first&&st.type!=="time"&&!app.querySelector("[data-act=samereg]"))try{first.focus()}catch(e){}
+  try{window.scrollTo(0,0)}catch(e){}
+}
+function err(t){var e=$("err");if(!e)return;e.textContent=t;e.hidden=!t}
+function submit(st){var m=st.read?st.read():"";if(m)return err(m);goNext()}
+
+function bindCommon(app,st){
+  var l=app.querySelectorAll("[data-act],[data-pick],[data-route],[data-ext],[data-apick],[data-edit],[data-tz],[data-at]");
+  for(var i=0;i<l.length;i++)(function(b){
+    b.onclick=function(){
+      var a=b.getAttribute("data-act");
+      if(a==="home"){screen="home";return render()}
+      if(a==="back")return goBack();
+      if(a==="next")return submit(st);
+      if(a==="newflt"){var keep=S.reg;newDep();S.newFlt=true;S.reg=keep;return goNext()}
+      if(a==="other"){S.otherRoute=true;return render()}
+      if(a==="samereg")return goNext();
+      if(a==="nokids"){S.kids=false;S.ch=0;S.inf=0;return goNext()}
+      if(a==="kids"){S.kids=true;return render()}
+      if(a==="manual"){S.manual=true;return goNext()}
+      if(a==="now"){S[st.id]=utcMin();var m=checkTimes(st.id);if(m)return err(m);return goNext()}
+      if(b.hasAttribute("data-pick")){var f=flights()[+b.getAttribute("data-pick")];
+        S.newFlt=false;S.flt=f.flt;S.reg=f.reg;S.from=f.from;S.to=f.to;S.durH=f.durH;S.durM=f.durM;if(f.cfg)S.cfg=f.cfg;return goNext()}
+      if(b.hasAttribute("data-route")){var r=b.getAttribute("data-route").split("-");S.from=r[0];S.to=r[1];S.otherRoute=false;return goNext()}
+      if(b.hasAttribute("data-ext")){S.ext=b.getAttribute("data-ext")||null;return goNext()}
+      if(b.hasAttribute("data-apick")){var p=pending()[+b.getAttribute("data-apick")];
+        S.flt=p.flt;S.reg=p.regRaw||p.reg;S.at=p.to;S.day=p.day;S.manual=false;return goNext()}
+      if(b.hasAttribute("data-edit"))return editStep(b.getAttribute("data-edit"));
+      if(b.hasAttribute("data-tz")){var keepZ=parseT(val("tm"));useLocal=b.getAttribute("data-tz")==="1";
+        var cv=val("tm");render();if(keepZ!==null)$("tm").value=showT(keepZ);else $("tm").value=cv;st.live();return}
+      if(b.hasAttribute("data-at")){$("aat").value=b.getAttribute("data-at");var s2=app.querySelectorAll("[data-at]");for(var j=0;j<s2.length;j++)s2[j].className="ch"+(s2[j]===b?" sel":"");return}
+    };
+  })(l[i]);
+  var ins=app.querySelectorAll("input");
+  for(var k=0;k<ins.length;k++)ins[k].addEventListener("keydown",function(e){if(e.keyCode===13){e.preventDefault();if(st.type!=="sum")submit(st)}});
+}
+
+/* ---------- send ---------- */
+function sendBtns(t){return '<div class="send"><button type="button" class="cp">📋 نسخ</button><a class="wa" href="https://wa.me/?text='+encodeURIComponent(t)+'" target="_blank" rel="noopener">واتساب</a></div>'}
+function setSendText(app,t){app._text=t;app.querySelector(".wa").href="https://wa.me/?text="+encodeURIComponent(t)}
+function bindSend(app,t,rec){
+  app._text=t;
+  app.querySelector(".cp").onclick=function(){if(rec)record(app._text);copy(app._text)};
+  app.querySelector(".wa").onclick=function(){if(rec)record(app._text)};
+  var h=app.querySelector("[data-act=home]");if(h)h.onclick=function(){screen="home";render()};
+}
+function record(text){
+  var all=sget("mvt_hist",{}),k=dayKey(),list=all[k]||[];
+  if(list.length&&list[list.length-1].text===text)return;
+  var h={mode:S.mode,text:text,ts:Date.now(),flt:S.flt,day:S.day};
+  if(S.mode==="dep"){
+    h.summary=S.flt+" "+S.from+"→"+S.to+(S.ext?" +"+(S.ext==="L"?"LDM":S.ext==="P"?"PSM":"LDM+PSM"):"");
+    h.reg=clean(S.reg);h.regRaw=S.reg;h.from=S.from;h.to=S.to;h.ea=fmt(wrapM(S.air+S.durH*60+S.durM));
+    var fl=flights().filter(function(f){return f.flt!==S.flt});
+    fl.unshift({flt:S.flt,reg:S.reg,from:S.from,to:S.to,durH:S.durH,durM:S.durM,cfg:S.cfg});sset("mvt_flights",fl.slice(0,8));
+  }else{
+    h.summary=S.flt+" وصل "+S.at;
+    list.forEach(function(x){if(x.mode==="dep"&&x.flt===S.flt)x.arrived=true});
+  }
+  list.push(h);var o={};o[k]=list;sset("mvt_hist",o);
+}
+function toast(t){$("toastT").textContent=t;$("toast").hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){$("toast").hidden=true},1800)}
+function copy(t){
+  function old(){
+    var ta=$("cpy");ta.value=t;ta.select();try{ta.setSelectionRange(0,t.length)}catch(e){}
+    var ok=false;try{ok=document.execCommand("copy")}catch(e){}
+    if(ok)return toast("تم النسخ ✓");
+    var m=document.querySelector(".strip");if(m){var r=document.createRange();r.selectNodeContents(m);var s=window.getSelection();s.removeAllRanges();s.addRange(r)}
+    toast("النص محدد، انسخه يدوياً");
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast("تم النسخ ✓")},old);else old();
+}
+
+/* ---------- home ---------- */
+function renderHome(app){
+  var p=pending().length, list=hist().slice().reverse();
+  var h='<div class="modes">'+
+    '<button type="button" class="mode dep" data-m="dep"><span class="ic">🛫</span><b>مغادرة</b><small>DEPARTURE</small></button>'+
+    '<button type="button" class="mode arr" data-m="arr"><span class="ic">🛬</span><b>وصول</b><small>'+(p?p+" رحلة تنتظر الوصول":"ARRIVAL")+'</small></button></div>'+
+    '<div class="sec-t">رسائل اليوم</div><div class="history">';
+  if(!list.length)h+='<div class="empty">ما فيش رسائل اليوم. ابدأ بالمغادرة.</div>';
+  list.forEach(function(x,i){h+='<div class="hitem"><span class="pill '+x.mode+'">'+(x.mode==="dep"?"مغادرة":"وصول")+'</span><span class="m">'+esc(x.summary)+' · '+new Date(x.ts).toISOString().slice(11,16)+'Z</span><button type="button" data-h="'+i+'">عرض</button></div>'});
+  app.innerHTML=h+'</div>';
+  var ms=app.querySelectorAll("[data-m]");
+  for(var i=0;i<ms.length;i++)ms[i].onclick=function(){
+    if(this.getAttribute("data-m")==="dep")newDep();else newArr();
+    screen="q";cur=steps()[0].id;render();
+  };
+  var hs=app.querySelectorAll("[data-h]");
+  for(var j=0;j<hs.length;j++)hs[j].onclick=function(){viewText=list[+this.getAttribute("data-h")].text;screen="view";render()};
+}
+render();
+})();
+</script>
+</body>
+</html>
